@@ -117,4 +117,4 @@ hl.exec_cmd("hyprtk-arc-menu")
 
 ## License
 
-Apache-2.0 (ported concept from MaterialArcMenu, Apache-2.0).
+GPL-2.0. Ported concept from MaterialArcMenu (Apache-2.0).
