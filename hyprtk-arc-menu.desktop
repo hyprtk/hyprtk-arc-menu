@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=hyprtk-arc-menu
+Comment=Material-style arc menu for Wayland
+Exec=hyprtk-arc-menu
+Type=Application
+Categories=Utility;
+Terminal=false

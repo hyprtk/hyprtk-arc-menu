@@ -1,0 +1,46 @@
+{
+  "position": "bottom-right",
+  "shape": "circle",
+  "transparent": false,
+  "follow_waybar": true,
+  "margin": 24,
+  "radius": 140,
+  "fab_size": 56,
+  "item_size": 48,
+  "animation_time": 300,
+  "fab_icon": "view-grid-symbolic",
+  "fab_color": "#c084fc",
+  "fab_icon_color": "#000000",
+  "item_color": "#22d3ee",
+  "item_icon_color": "#000000",
+  "use_pywal": true,
+  "close_on_unfocus": false,
+  "close_on_click": true,
+  "items": [
+    {
+      "icon": "firefox",
+      "command": "firefox",
+      "tooltip": "Firefox"
+    },
+    {
+      "icon": "utilities-terminal",
+      "command": "alacritty",
+      "tooltip": "Terminal"
+    },
+    {
+      "icon": "system-file-manager",
+      "command": "thunar",
+      "tooltip": "Files"
+    },
+    {
+      "icon": "accessories-calculator",
+      "command": "qalculate-gtk",
+      "tooltip": "Calculator"
+    },
+    {
+      "icon": "preferences-system",
+      "action": "settings",
+      "tooltip": "Settings"
+    }
+  ]
+}
