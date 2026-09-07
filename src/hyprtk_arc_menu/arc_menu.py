@@ -6,6 +6,7 @@ inside a layer-shell surface.
 """
 from __future__ import annotations
 
+import colorsys
 import math
 import time
 from typing import Optional
@@ -16,10 +17,31 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
 
 from .config import POSITIONS, resolve_palette
+from .hypr_animations import border_period_ms
 
 
 def ease_out_cubic(t: float) -> float:
     return 1 - (1 - t) ** 3
+
+
+def hue_rotate(hex_color: str, degrees: float) -> str:
+    """Rotate a ``#rrggbb`` color's hue by ``degrees`` (loop-friendly)."""
+    hex_color = (hex_color or "").strip()
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    if len(h) != 6:
+        return hex_color
+    try:
+        r, g, b = (int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except ValueError:
+        return hex_color
+    hue, lum, sat = colorsys.rgb_to_hls(r, g, b)
+    hue = (hue + (degrees / 360.0)) % 1.0
+    r, g, b = colorsys.hls_to_rgb(hue, lum, sat)
+    return "#{:02x}{:02x}{:02x}".format(
+        int(round(r * 255)), int(round(g * 255)), int(round(b * 255))
+    )
 
 
 def _rgba_from_hex(hex_color: str) -> Gdk.RGBA:
@@ -75,6 +97,14 @@ class ArcMenu(Gtk.Fixed):
         self._palette = palette or resolve_palette(cfg, None)
         self._css_provider: Optional[Gtk.CssProvider] = None
 
+        # Border animation mirrors the bar's (low/high/custom from the bar
+        # config). Runs while the menu is open.
+        self._border_period = None
+        self._border_timer: Optional[int] = None
+        self._border_hue = 0.0
+        self._border_base = self._border_base_color()
+        self._animated_border: str | None = None
+
         self._open = False
         self._opening = False
         self._anim_start = 0.0
@@ -90,6 +120,16 @@ class ArcMenu(Gtk.Fixed):
         # Middle-click is handled at the toplevel window (see app.py).
 
         self._apply_css()
+        # The FAB is a persistent launcher (like the bar pill) — its border
+        # animates continuously while the app runs, not only while open.
+        self._start_border_animation()
+
+    def _border_base_color(self) -> str:
+        """Base colour for the border hue rotation (the FAB color, hex)."""
+        c = str(self._palette.get("fab_color") or "#c084fc")
+        if not c.startswith("#"):
+            return "#c084fc"
+        return c
 
     # ── geometry helpers ──────────────────────────────────────────
 
@@ -235,13 +275,19 @@ class ArcMenu(Gtk.Fixed):
             hover = None
             fab_shadow = "0 2px 8px rgba(0,0,0,0.35)"
             item_shadow = "0 2px 6px rgba(0,0,0,0.3)"
+        # Animated border colour (mirrors the bar); solid 2px by default so the
+        # animation is visible, unless the user opted for a borderless FAB.
+        fab_border = self._animated_border or p.get("fab_border") or "none"
+        item_border = self._animated_border or p.get("item_border") or "none"
+        fab_border_rule = f"border: 2px solid {fab_border};" if fab_border != "none" else "border: none;"
+        item_border_rule = f"border: 2px solid {item_border};" if item_border != "none" else "border: none;"
         css = f"""
         .arc-fab {{
             background-image: none;
             background-color: {fab_bg};
             color: {p["fab_icon_color"]};
             border-radius: {radius};
-            border: none;
+            {fab_border_rule}
             box-shadow: {fab_shadow};
         }}
         .arc-fab:hover {{
@@ -252,7 +298,7 @@ class ArcMenu(Gtk.Fixed):
             background-color: {item_bg};
             color: {p["item_icon_color"]};
             border-radius: {radius};
-            border: none;
+            {item_border_rule}
             box-shadow: {item_shadow};
         }}
         .arc-item:hover {{
@@ -351,6 +397,38 @@ class ArcMenu(Gtk.Fixed):
         self._opening = False
         self._anim_start = time.monotonic()
         self._schedule_tick(win_w, win_h)
+
+    # ── border animation (mirrors the bar) ───────────────────────
+
+    def _start_border_animation(self) -> None:
+        """Start the FAB/item border hue animation if the bar has one enabled."""
+        if self._border_timer is not None:
+            return
+        self._border_period = border_period_ms()
+        if self._border_period is None:
+            return
+        self._border_hue = 0.0
+        self._border_base = self._border_base_color()
+        self._border_timer = GLib.timeout_add(33, self._border_tick)
+
+    def _stop_border_animation(self) -> None:
+        if self._border_timer is not None:
+            GLib.source_remove(self._border_timer)
+            self._border_timer = None
+        self._animated_border = None
+        self._apply_css()
+
+    def _border_tick(self) -> bool:
+        if self._border_period is None:
+            return False
+        step = 360.0 * 33.0 / self._border_period
+        self._border_hue = (self._border_hue + step) % 360.0
+        self._animated_border = hue_rotate(self._border_base, self._border_hue)
+        try:
+            self._apply_css()
+        except Exception:
+            return False
+        return True
 
     def _schedule_tick(self, win_w: int, win_h: int) -> None:
         if self._anim_timer is not None:
