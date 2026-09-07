@@ -3,6 +3,17 @@
 All notable changes to hyprtk-arc-menu are documented in this file.
 Dates are in YYYY-MM-DD format.
 
+## [0.1.2] - 2026-09-07
+
+### Changed
+
+- **Follows hyprtk-bar instead of waybar** — `follow_waybar` is now
+  `follow_bar`; the menu reads the bar's imported theme
+  (`~/.config/hyprtk-bar/config.json` `theme.source: "imported"` +
+  `theme.theme_name` + `~/.config/hyprtk-bar/themes/`) instead of the stale
+  `~/.cache/.themestyle.sh` + system waybar themes dir. `waybar_theme.py` is
+  now `bar_theme.py`. Matches the hyprtk-bar schema rename.
+
 ## [0.1.1] - 2026-09-03
 
 ### Changed
