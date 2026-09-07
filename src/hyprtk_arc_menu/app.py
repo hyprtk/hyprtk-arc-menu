@@ -14,7 +14,7 @@ from gi.repository import Gdk, Gio, GLib, Gtk, GtkLayerShell
 from .arc_menu import ArcMenu
 from .config import POSITIONS, PYWAL_PATH, load, load_pywal_colors, resolve_palette
 from .settings import SettingsDialog
-from .waybar_theme import THEME_STATE, read_theme_palette
+from .bar_theme import BAR_THEMES, read_theme_palette
 
 log = logging.getLogger("hyprtk_arc_menu.app")
 
@@ -27,7 +27,7 @@ class ArcWindow(Gtk.Window):
         self._cfg = cfg
         self._wal_monitor: Gio.FileMonitor | None = None
         self._wal_debounce: int | None = None
-        self._waybar_monitor: Gio.FileMonitor | None = None
+        self._bar_monitor: Gio.FileMonitor | None = None
         self._theme_debounce: int | None = None
 
         self.set_title("hyprtk-arc-menu")
@@ -63,20 +63,20 @@ class ArcWindow(Gtk.Window):
         # toplevel window so it works over empty areas and buttons alike.
         self.connect("button-press-event", self._on_pointer_press)
 
-        if cfg.get("follow_waybar", True):
-            self._setup_waybar_monitor()
+        if cfg.get("follow_bar", True):
+            self._setup_bar_monitor()
         if cfg.get("use_pywal", True):
             self._setup_wal_monitor()
 
-    # ── theming (pywal + waybar theme) ───────────────────────────
+    # ── theming (pywal + bar theme) ─────────────────────────────
 
     def _build_palette(self) -> dict:
-        """Current palette: Waybar theme glass/text, else pywal, else config."""
+        """Current palette: bar theme glass/text, else pywal, else config."""
         pywal = load_pywal_colors()
-        if self._cfg.get("follow_waybar", True):
-            waybar = read_theme_palette(pywal)
-            if waybar:
-                return resolve_palette(self._cfg, pywal, waybar)
+        if self._cfg.get("follow_bar", True):
+            bar_theme = read_theme_palette(pywal)
+            if bar_theme:
+                return resolve_palette(self._cfg, pywal, bar_theme)
         return resolve_palette(self._cfg, pywal, None)
 
     def _apply_current_palette(self) -> None:
@@ -105,18 +105,18 @@ class ArcWindow(Gtk.Window):
         self._apply_current_palette()
         return GLib.SOURCE_REMOVE
 
-    def _setup_waybar_monitor(self) -> None:
-        """Watch the Waybar theme state file so theme switches re-theme live."""
+    def _setup_bar_monitor(self) -> None:
+        """Watch the bar themes dir so theme switches re-theme live."""
         try:
-            self._waybar_monitor = Gio.File.new_for_path(
-                str(THEME_STATE.parent)
+            self._bar_monitor = Gio.File.new_for_path(
+                str(BAR_THEMES.parent)
             ).monitor_directory(Gio.FileMonitorFlags.NONE, None)
         except GLib.Error as exc:
-            log.warning("Could not monitor waybar theme state: %s", exc)
+            log.warning("Could not monitor bar theme state: %s", exc)
             return
-        self._waybar_monitor.connect("changed", self._on_waybar_changed)
+        self._bar_monitor.connect("changed", self._on_bar_changed)
 
-    def _on_waybar_changed(self, _monitor, file, *_args) -> None:
+    def _on_bar_changed(self, _monitor, file, *_args) -> None:
         if file.get_basename() != THEME_STATE.name:
             return
         if self._theme_debounce is not None:
@@ -251,7 +251,7 @@ class ArcWindow(Gtk.Window):
             if getattr(self, deb, None) is not None:
                 GLib.source_remove(getattr(self, deb))
                 setattr(self, deb, None)
-        for mon in ("_wal_monitor", "_waybar_monitor"):
+        for mon in ("_wal_monitor", "_bar_monitor"):
             if getattr(self, mon, None) is not None:
                 getattr(self, mon).cancel()
                 setattr(self, mon, None)
@@ -281,8 +281,8 @@ class ArcWindow(Gtk.Window):
         for edge in position["edges"]:
             GtkLayerShell.set_anchor(self, edge, True)
 
-        if self._cfg.get("follow_waybar", True):
-            self._setup_waybar_monitor()
+        if self._cfg.get("follow_bar", True):
+            self._setup_bar_monitor()
         if self._cfg.get("use_pywal", True):
             self._setup_wal_monitor()
 

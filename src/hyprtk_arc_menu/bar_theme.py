@@ -1,20 +1,20 @@
-"""Read the active Waybar theme and derive an arc menu palette from it.
+"""Read the active hyprtk-bar theme and derive an arc menu palette from it.
 
-The arc menu can mirror the look of the current Waybar theme: the menu button and
-items pick up the theme's bar background (glass) and text color, and re-theme
-live when the Waybar theme changes.
+The arc menu can mirror the look of the bar's imported theme: the menu button
+and items pick up the theme's bar background (glass) and text color, and
+re-theme live when the bar's theme changes.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from pathlib import Path
 
-log = logging.getLogger("hyprtk_arc_menu.waybar")
+log = logging.getLogger("hyprtk_arc_menu.bar_theme")
 
-THEME_STATE = Path.home() / ".cache" / ".themestyle.sh"
-THEMES_DIR = Path.home() / "hyprtk" / "configs" / "waybar" / "themes"
-DEFAULT_VARIATION = "hyprtk-aero-top"
+BAR_CONFIG = Path.home() / ".config" / "hyprtk-bar" / "config.json"
+BAR_THEMES = Path.home() / ".config" / "hyprtk-bar" / "themes"
 
 
 def _rgba_string(r, g, b, a) -> str:
@@ -65,21 +65,23 @@ def _find_block(css: str, selector: str) -> str | None:
 
 
 def current_theme_dir() -> Path | None:
-    """Directory of the currently selected Waybar theme."""
-    variation = None
-    if THEME_STATE.is_file():
-        text = THEME_STATE.read_text().strip()
-        parts = text.split(";")
-        if len(parts) >= 2 and parts[1].strip("/"):
-            variation = parts[1].strip("/")
-    if variation is None:
-        variation = DEFAULT_VARIATION
-    theme_dir = THEMES_DIR / variation
+    """Directory of the bar's currently selected imported theme."""
+    try:
+        data = json.loads(BAR_CONFIG.read_text())
+    except (OSError, ValueError):
+        return None
+    theme = data.get("theme") or {}
+    if theme.get("source") != "imported":
+        return None
+    name = str(theme.get("theme_name") or "").strip()
+    if not name:
+        return None
+    theme_dir = BAR_THEMES / name
     return theme_dir if theme_dir.is_dir() else None
 
 
 def read_theme_palette(pywal: dict | None = None) -> dict | None:
-    """Build an arc menu palette from the active Waybar theme.
+    """Build an arc menu palette from the bar's active imported theme.
 
     Returns {fab_color, item_color, fab_icon_color, item_icon_color} or None if
     the theme cannot be read.

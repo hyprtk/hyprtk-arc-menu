@@ -63,7 +63,7 @@ DEFAULTS = {
     "position": "bottom-right",
     "shape": "circle",              # circle | square (square fans items on a square perimeter)
     "transparent": False,           # transparent button/item backgrounds (icons only)
-    "follow_waybar": True,          # mirror the active Waybar theme's glass + text colors
+    "follow_bar": True,             # mirror the bar's imported theme glass + text colors
     "margin": 24,
     "radius": 140,
     "fab_size": 56,
@@ -109,7 +109,7 @@ def validate(cfg: dict) -> dict:
         valid["shape"] = "circle"
 
     valid["transparent"] = bool(valid.get("transparent", False))
-    valid["follow_waybar"] = bool(valid.get("follow_waybar", True))
+    valid["follow_bar"] = bool(valid.get("follow_bar", True))
 
     for key in ("margin", "radius", "fab_size", "item_size", "animation_time"):
         try:
@@ -197,12 +197,12 @@ def _contrast_ok(fg_css: str, bg_css: str) -> bool:
     return abs(lum(frgb) - lum(brgb)) > 100
 
 
-def resolve_palette(cfg: dict, pywal: dict | None = None, waybar: dict | None = None) -> dict:
+def resolve_palette(cfg: dict, pywal: dict | None = None, bar_theme: dict | None = None) -> dict:
     """Resolve FAB/item colors.
 
-    - follow_waybar + use_pywal: pywal accents for the buttons, Waybar theme
+    - follow_bar + use_pywal: pywal accents for the buttons, bar theme
       decides icon lightness (so pywal colors are never lost on theme switches).
-    - follow_waybar only: Waybar theme glass + text.
+    - follow_bar only: bar theme glass + text.
     - otherwise: pywal color5/color6, or explicit config colors.
     """
     palette = {
@@ -212,20 +212,20 @@ def resolve_palette(cfg: dict, pywal: dict | None = None, waybar: dict | None = 
         "item_icon_color": cfg.get("item_icon_color", "#000000"),
     }
     pywal_on = cfg.get("use_pywal", True) and bool(pywal)
-    wb_on = cfg.get("follow_waybar", True) and bool(waybar)
+    bar_on = cfg.get("follow_bar", True) and bool(bar_theme)
 
-    if wb_on and pywal_on:
+    if bar_on and pywal_on:
         fab = pywal.get("color5") or palette["fab_color"]
         item = pywal.get("color6") or palette["item_color"]
         palette["fab_color"] = fab
         palette["item_color"] = item
-        theme_fg = waybar.get("fab_icon_color") or palette["fab_icon_color"]
+        theme_fg = bar_theme.get("fab_icon_color") or palette["fab_icon_color"]
         palette["fab_icon_color"] = theme_fg if _contrast_ok(theme_fg, fab) else contrast_fg(fab)
-        theme_fg = waybar.get("item_icon_color") or palette["item_icon_color"]
+        theme_fg = bar_theme.get("item_icon_color") or palette["item_icon_color"]
         palette["item_icon_color"] = theme_fg if _contrast_ok(theme_fg, item) else contrast_fg(item)
         return palette
-    if wb_on:
-        palette.update(waybar)
+    if bar_on:
+        palette.update(bar_theme)
         return palette
     if pywal_on:
         fab = pywal.get("color5") or palette["fab_color"]
