@@ -6,7 +6,6 @@ inside a layer-shell surface.
 """
 from __future__ import annotations
 
-import colorsys
 import math
 import time
 from typing import Optional
@@ -17,31 +16,11 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk
 
 from .config import POSITIONS, resolve_palette
-from .hypr_animations import border_period_ms
+from .hypr_animations import active_border_colors, border_period_ms, lerp_color
 
 
 def ease_out_cubic(t: float) -> float:
     return 1 - (1 - t) ** 3
-
-
-def hue_rotate(hex_color: str, degrees: float) -> str:
-    """Rotate a ``#rrggbb`` color's hue by ``degrees`` (loop-friendly)."""
-    hex_color = (hex_color or "").strip()
-    h = hex_color.lstrip("#")
-    if len(h) == 3:
-        h = "".join(c * 2 for c in h)
-    if len(h) != 6:
-        return hex_color
-    try:
-        r, g, b = (int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
-    except ValueError:
-        return hex_color
-    hue, lum, sat = colorsys.rgb_to_hls(r, g, b)
-    hue = (hue + (degrees / 360.0)) % 1.0
-    r, g, b = colorsys.hls_to_rgb(hue, lum, sat)
-    return "#{:02x}{:02x}{:02x}".format(
-        int(round(r * 255)), int(round(g * 255)), int(round(b * 255))
-    )
 
 
 def _rgba_from_hex(hex_color: str) -> Gdk.RGBA:
@@ -102,7 +81,7 @@ class ArcMenu(Gtk.Fixed):
         self._border_period = None
         self._border_timer: Optional[int] = None
         self._border_hue = 0.0
-        self._border_base = self._border_base_color()
+        self._border_colors: Optional[tuple] = None
         self._animated_border: str | None = None
 
         self._open = False
@@ -123,13 +102,6 @@ class ArcMenu(Gtk.Fixed):
         # The FAB is a persistent launcher (like the bar pill) — its border
         # animates continuously while the app runs, not only while open.
         self._start_border_animation()
-
-    def _border_base_color(self) -> str:
-        """Base colour for the border hue rotation (the FAB color, hex)."""
-        c = str(self._palette.get("fab_color") or "#c084fc")
-        if not c.startswith("#"):
-            return "#c084fc"
-        return c
 
     # ── geometry helpers ──────────────────────────────────────────
 
@@ -401,14 +373,22 @@ class ArcMenu(Gtk.Fixed):
     # ── border animation (mirrors the bar) ───────────────────────
 
     def _start_border_animation(self) -> None:
-        """Start the FAB/item border hue animation if the bar has one enabled."""
+        """Start the FAB/item border animation if the bar has one enabled.
+
+        Interpolates between Hyprland's two ``active_border`` colours
+        (``color11`` + ``color4``) on a ping-pong loop — mirroring the
+        borderangle gradient, not a full hue wheel.
+        """
         if self._border_timer is not None:
             return
         self._border_period = border_period_ms()
         if self._border_period is None:
             return
+        colors = active_border_colors()
+        if not colors:
+            return
+        self._border_colors = colors
         self._border_hue = 0.0
-        self._border_base = self._border_base_color()
         self._border_timer = GLib.timeout_add(33, self._border_tick)
 
     def _stop_border_animation(self) -> None:
@@ -421,9 +401,10 @@ class ArcMenu(Gtk.Fixed):
     def _border_tick(self) -> bool:
         if self._border_period is None:
             return False
-        step = 360.0 * 33.0 / self._border_period
-        self._border_hue = (self._border_hue + step) % 360.0
-        self._animated_border = hue_rotate(self._border_base, self._border_hue)
+        # Ping-pong: 0 -> 1 -> 0 over the period (one leg = half the period).
+        self._border_hue = (self._border_hue + 33.0 / (self._border_period / 2.0)) % 2.0
+        t = self._border_hue if self._border_hue <= 1.0 else 2.0 - self._border_hue
+        self._animated_border = lerp_color(self._border_colors[0], self._border_colors[1], t)
         try:
             self._apply_css()
         except Exception:
