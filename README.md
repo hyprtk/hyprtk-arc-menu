@@ -1,5 +1,11 @@
 # hyprtk-arc-menu
 
+> **ARCHIVED — 2026-09-08 — superseded by hyprtk-bar.**
+> The arc menu is now built into **hyprtk-bar** as an overlay module: it is
+> toggled from `Super+Ctrl+M` (or the FAB), themed by the bar, and configured
+> from the bar settings dialogue's *Arc Menu* tab. Config lives under
+> `arcmenu` in `~/.config/hyprtk-bar/config.json`.
+
 A Material-style arc menu for Arch Linux on Wayland (Hyprland), ported from the
 Android [MaterialArcMenu](https://github.com/saurabharora90/MaterialArcMenu)
 custom view.
